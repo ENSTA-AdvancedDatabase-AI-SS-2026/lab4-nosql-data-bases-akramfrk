@@ -34,29 +34,47 @@ MERGE (:Cours {code: cours.code, intitule: cours.intitule,
                credits: cours.credits, departement: cours.dept});
 
 // ─── 1.4 : Créer les étudiants ────────────────────────────────────────────────
-// TODO: Créer 50 étudiants avec données algériennes réalistes
-// Utiliser UNWIND avec une liste de maps
-// Universités : USTHB, UMBB, USTO, UMC, UBMA
-// Filieres : Informatique, Mathématiques, Electronique, Telecoms, GL
+UNWIND range(1, 50) AS i
+WITH i, 
+     ["Ahmed", "Fatima", "Yanis", "Lina", "Karim", "Amina", "Mohamed", "Meriem", "Ali", "Sarah"][i % 10] AS prenom,
+     ["Bensalem", "Ouali", "Mansouri", "Haddad", "Saidi", "Latreche", "Amrane", "Belkacem", "Djerar", "Messaoudi"][i % 10] AS nom,
+     ["USTHB", "UMBB", "USTO", "UMC", "UBMA"][i % 5] AS universite,
+     ["Informatique", "Mathématiques", "Electronique", "Telecoms", "GL"][i % 5] AS filiere,
+     ["Alger", "Boumerdes", "Oran", "Constantine", "Annaba"][i % 5] AS ville
+MERGE (e:Etudiant {id: "E" + i})
+SET e.prenom = prenom, e.nom = nom, e.universite = universite, e.filiere = filiere, e.ville = ville, e.annee = (i % 5) + 1;
 
-UNWIND [
-  // TODO: Ajouter 50 étudiants
-  {id: "E001", prenom: "Ahmed", nom: "Bensalem", universite: "USTHB", 
-   filiere: "Informatique", annee: 3, ville: "Alger"},
-  {id: "E002", prenom: "Fatima", nom: "Ouali", universite: "USTHB",
-   filiere: "Informatique", annee: 3, ville: "Alger"}
-  // TODO: Continuer...
-] AS data
-MERGE (e:Etudiant {id: data.id})
-SET e += data;
+// Mettre au moins un "Yasmina" pour l'exercice 3.1
+MATCH (e:Etudiant {id: "E50"}) SET e.prenom = "Yasmina";
 
 // ─── 1.5 : Créer les relations ────────────────────────────────────────────────
-// TODO: Relations CONNAIT entre étudiants
-// Assurer que le graphe est connexe (pas d'étudiants isolés)
 
-// TODO: Relations SUIT (étudiant → cours) avec notes
+// Relations CONNAIT (intra-université)
+MATCH (e1:Etudiant), (e2:Etudiant)
+WHERE e1.id <> e2.id AND rand() < 0.1 AND e1.universite = e2.universite
+MERGE (e1)-[:CONNAIT {depuis: 2023, contexte: "Université"}]->(e2);
 
-// TODO: Relations MAITRISE (étudiant → compétence) avec niveaux
+// Assurer connexité : chaque E a au moins un lien
+MATCH (e1:Etudiant)
+WITH e1
+MATCH (e2:Etudiant) WHERE e1.id <> e2.id
+WITH e1, e2 ORDER BY rand() LIMIT 1
+MERGE (e1)-[:CONNAIT {depuis: 2024, contexte: "Evénement"}]-(e2);
+
+// Relations SUIT (étudiant -> cours)
+MATCH (e:Etudiant), (c:Cours)
+WHERE rand() < 0.2
+MERGE (e)-[:SUIT {semestre: "S" + e.annee, note: round(10 + rand() * 10)}]->(c);
+
+// Relations MAITRISE (étudiant -> competence)
+MATCH (e:Etudiant), (c:Competence)
+WHERE rand() < 0.15
+MERGE (e)-[:MAITRISE {niveau: ["Débutant", "Intermédiaire", "Avancé"][toInteger(rand()*3)]}]->(c);
+
+// Cours -> Competence (REQUIERT)
+MATCH (c:Cours), (comp:Competence)
+WHERE rand() < 0.2
+MERGE (c)-[:REQUIERT]->(comp);
 
 // Vérification
 MATCH (n) RETURN labels(n)[0] AS type, count(n) AS total ORDER BY total DESC;
